@@ -26,6 +26,7 @@ BlockChat offers a user-friendly and intuitive platform for secure messaging and
 ### Prerequisites:
 - Ensure you have MetaMask installed and set up with an Ethereum account.
 - Install XAMPP or another local server environment to host the BlockChat application locally.
+- Or start using the application right away: https://blochat.netlify.app/
 
 ### Creating an Account:
 - To use BlockChat, users need to have an Ethereum account.
