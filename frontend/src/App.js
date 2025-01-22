@@ -111,21 +111,15 @@ function App() {
     const loadMessages = async () => {
         try {
             const { contract, account } = web3State;
-            console.log('Loading messages for recipient:', selectedRecipient);
             
             const response = await contract.methods
                 .loadChat(selectedRecipient)
                 .call({ from: account });
-            
-            console.log('Raw response from contract:', response);
 
             // The response should be an object with '0' and '1' properties
             // where '0' is messages array and '1' is files array
             const messagesList = response[0] || [];
             const filesList = response[1] || [];
-            
-            console.log('Messages list:', messagesList);
-            console.log('Files list:', filesList);
             
             // Format messages according to the contract's Message struct
             const formattedMessages = messagesList.map(msg => ({
@@ -144,18 +138,50 @@ function App() {
                 timestamp: Number(file.timestamp)
             }));
 
-            console.log('Formatted messages:', formattedMessages);
-            console.log('Formatted files:', formattedFiles);
-
             setMessages(formattedMessages);
             setFiles(formattedFiles);
         } catch (error) {
             console.error('Error loading messages:', error);
-            console.error('Error details:', {
-                name: error.name,
-                message: error.message,
-                stack: error.stack
+        }
+    };
+
+    const decodeTransactionData = async (tx, functionName) => {
+        if (currentNetwork !== 'GANACHE') return;
+        
+        try {
+            const { contract, web3 } = web3State;
+            
+            // Get transaction
+            const transaction = await web3.eth.getTransaction(tx.transactionHash);
+            
+            // Get function signature from ABI
+            const functionAbi = contract.options.jsonInterface.find(
+                (abi) => abi.name === functionName
+            );
+
+            if (!functionAbi) {
+                throw new Error(`Function ${functionName} not found in ABI`);
+            }
+
+            // Get the raw input data
+            console.log('\nRaw Transaction Data:', transaction.input);
+
+            // Decode the input data
+            const decodedParameters = web3.eth.abi.decodeParameters(
+                functionAbi.inputs,
+                '0x' + transaction.input.slice(10)
+            );
+
+            // Simplify the decoded output
+            const simplifiedOutput = {};
+            functionAbi.inputs.forEach((input, index) => {
+                simplifiedOutput[input.name] = decodedParameters[index];
             });
+
+            console.log('Decoded Data:', JSON.stringify(simplifiedOutput, null, 2));
+            console.log('----------------------------------------\n');
+        } catch (error) {
+            console.error('Error decoding transaction:', error);
         }
     };
 
@@ -169,9 +195,8 @@ function App() {
                 .sendMessage(selectedRecipient, content)
                 .send({ from: account });
             
-            console.log('Message sent successfully:', tx); // Debug log
+            await decodeTransactionData(tx, 'sendMessage');
             
-            // Wait a brief moment for the blockchain to update
             setTimeout(async () => {
                 await loadMessages();
                 setIsLoading(false);
@@ -194,10 +219,11 @@ function App() {
             reader.onload = async () => {
                 try {
                     const fileHash = await uploadToIPFS(reader.result);
-                    await contract.methods
+                    const tx = await contract.methods
                         .sendFile(selectedRecipient, file.name, fileHash)
                         .send({ from: account });
                     
+                    await decodeTransactionData(tx, 'sendFile');
                     await loadMessages();
                 } catch (error) {
                     console.error('Error uploading file:', error);
@@ -219,10 +245,11 @@ function App() {
         setIsLoading(true);
         try {
             const { contract, account } = web3State;
-            await contract.methods
+            const tx = await contract.methods
                 .setRecipientAddress(address)
                 .send({ from: account });
             
+            await decodeTransactionData(tx, 'setRecipientAddress');
             await loadRecipients(contract, account);
         } catch (error) {
             console.error('Error adding recipient:', error);
@@ -249,12 +276,12 @@ function App() {
         try {
             const { contract, account } = web3State;
             
-            // Single transaction to clear both messages and files
-            await contract.methods
+            const tx = await contract.methods
                 .clearChat(selectedRecipient)
                 .send({ from: account });
             
-            // Clear local state
+            await decodeTransactionData(tx, 'clearChat');
+            
             setMessages([]);
             setFiles([]);
             

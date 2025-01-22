@@ -137,8 +137,6 @@ const Chat = ({ messages, files, currentAccount, onClearChat, isLoading }) => {
     const messagesContainerRef = useRef(null);
 
     useEffect(() => {
-        console.log('Chat component updated:', { messages, files }); // Debug log
-        // Scroll to bottom when messages update
         if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
