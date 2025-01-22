@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import './App.css';
 import Chat from './components/Chat';
 import MessageInput from './components/MessageInput';
-import FileUpload from './components/FileUpload';
 import RecipientSelect from './components/RecipientSelect';
 import { initWeb3, uploadToIPFS } from './utils/web3';
 import contractDetails from './contracts/contract-address.json';
@@ -290,16 +289,11 @@ function App() {
                     onClearChat={handleClearChat}
                     isLoading={isLoading}
                 />
-                <InputWrapper>
-                    <MessageInput
-                        onSendMessage={handleSendMessage}
-                        isLoading={isLoading}
-                    />
-                    <FileUpload
-                        onFileSelect={handleFileSelect}
-                        isUploading={isUploading}
-                    />
-                </InputWrapper>
+                <MessageInput
+                    onSendMessage={handleSendMessage}
+                    onSendFile={handleFileSelect}
+                    isLoading={isLoading || isUploading}
+                />
             </ChatWrapper>
         </AppWrapper>
     );
