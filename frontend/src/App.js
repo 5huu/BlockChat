@@ -7,6 +7,7 @@ import RecipientSelect from './components/RecipientSelect';
 import { initWeb3, uploadToIPFS } from './utils/web3';
 import contractDetails from './contracts/contract-address.json';
 import styled from 'styled-components';
+import NetworkSwitch from './components/NetworkSwitch';
 
 const AppWrapper = styled.div`
   min-height: 100vh;
@@ -47,12 +48,9 @@ function App() {
     const [selectedRecipient, setSelectedRecipient] = useState('');
     const [messages, setMessages] = useState([]);
     const [files, setFiles] = useState([]);
-    
-    // Separate loading states for different actions
-    const [isSending, setIsSending] = useState(false);
-    const [isClearing, setIsClearing] = useState(false);
-    const [isAddingRecipient, setIsAddingRecipient] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [currentNetwork, setCurrentNetwork] = useState('SEPOLIA');
 
     useEffect(() => {
         initializeWeb3();
@@ -69,9 +67,27 @@ function App() {
     const initializeWeb3 = async () => {
         try {
             const { web3, account } = await initWeb3();
+            const networkId = await web3.eth.net.getId();
+            
+            // Set initial network and get correct contract address
+            let networkType;
+            if (networkId === 11155111) {
+                networkType = 'SEPOLIA';
+                setCurrentNetwork('SEPOLIA');
+            } else if (networkId === 1337) {
+                networkType = 'GANACHE';
+                setCurrentNetwork('GANACHE');
+            }
+
+            // Get the correct contract address for the current network
+            const contractAddress = contractDetails[networkType]?.SimpleChat;
+            if (!contractAddress) {
+                throw new Error('Contract address not found for this network');
+            }
+
             const contract = new web3.eth.Contract(
                 contractDetails.SimpleChatABI,
-                contractDetails.SimpleChat
+                contractAddress
             );
             
             setWeb3State({ web3, contract, account });
@@ -147,22 +163,24 @@ function App() {
     const handleSendMessage = async (content) => {
         if (!selectedRecipient || !content.trim()) return;
 
-        setIsSending(true);
+        setIsLoading(true);
         try {
             const { contract, account } = web3State;
-            await contract.methods
+            const tx = await contract.methods
                 .sendMessage(selectedRecipient, content)
                 .send({ from: account });
+            
+            console.log('Message sent successfully:', tx); // Debug log
             
             // Wait a brief moment for the blockchain to update
             setTimeout(async () => {
                 await loadMessages();
-                setIsSending(false);
+                setIsLoading(false);
             }, 1000);
         } catch (error) {
             console.error('Error sending message:', error);
             alert('Failed to send message. Please try again.');
-            setIsSending(false);
+            setIsLoading(false);
         }
     };
 
@@ -199,7 +217,7 @@ function App() {
     };
 
     const handleAddRecipient = async (address) => {
-        setIsAddingRecipient(true);
+        setIsLoading(true);
         try {
             const { contract, account } = web3State;
             await contract.methods
@@ -211,35 +229,51 @@ function App() {
             console.error('Error adding recipient:', error);
             alert('Failed to add recipient. Please try again.');
         } finally {
-            setIsAddingRecipient(false);
+            setIsLoading(false);
+        }
+    };
+
+    const handleNetworkSwitch = async (network) => {
+        setIsLoading(true);
+        try {
+            setCurrentNetwork(network);
+            await initializeWeb3();
+        } finally {
+            setIsLoading(false);
         }
     };
 
     const handleClearChat = async () => {
         if (!selectedRecipient) return;
-
-        setIsClearing(true);
+        
+        setIsLoading(true);
         try {
             const { contract, account } = web3State;
+            
+            // Single transaction to clear both messages and files
             await contract.methods
                 .clearChat(selectedRecipient)
                 .send({ from: account });
             
-            // Clear the local state
+            // Clear local state
             setMessages([]);
             setFiles([]);
             
-            console.log('Chat cleared successfully');
         } catch (error) {
             console.error('Error clearing chat:', error);
             alert('Failed to clear chat. Please try again.');
         } finally {
-            setIsClearing(false);
+            setIsLoading(false);
         }
     };
 
     return (
         <AppWrapper>
+            <NetworkSwitch
+                currentNetwork={currentNetwork}
+                onNetworkSwitch={handleNetworkSwitch}
+                isLoading={isLoading}
+            />
             <ChatWrapper>
                 <AppTitle>BlockChat</AppTitle>
                 <RecipientSelect
@@ -247,19 +281,19 @@ function App() {
                     selectedRecipient={selectedRecipient}
                     onRecipientChange={setSelectedRecipient}
                     onAddRecipient={handleAddRecipient}
-                    isLoading={isAddingRecipient}
+                    isLoading={isLoading}
                 />
                 <Chat
                     messages={messages}
                     files={files}
                     currentAccount={web3State.account}
                     onClearChat={handleClearChat}
-                    isLoading={isClearing}
+                    isLoading={isLoading}
                 />
                 <InputWrapper>
                     <MessageInput
                         onSendMessage={handleSendMessage}
-                        isLoading={isSending}
+                        isLoading={isLoading}
                     />
                     <FileUpload
                         onFileSelect={handleFileSelect}

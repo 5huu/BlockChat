@@ -77,23 +77,9 @@ contract SimpleChat {
 
     function clearChat(address _receiverAddress) public {
         require(_receiverAddress != msg.sender, "Cannot clear chat for yourself");
-
         delete messages[msg.sender][_receiverAddress];
         delete files[msg.sender][_receiverAddress];
-
         emit ChatCleared(msg.sender, _receiverAddress, block.timestamp);
-    }
-
-    function clearFiles(address _receiverAddress, string memory _fileName) public {
-        require(_receiverAddress != msg.sender, "Cannot clear files for yourself");
-
-        File[] storage userFiles = files[msg.sender][_receiverAddress];
-        for (uint i = 0; i < userFiles.length; i++) {
-            if (keccak256(bytes(userFiles[i].fileName)) == keccak256(bytes(_fileName))) {
-                delete userFiles[i];
-                break;
-            }
-        }
     }
 
     function getMessages(address _receiver) public view returns (Message[] memory) {

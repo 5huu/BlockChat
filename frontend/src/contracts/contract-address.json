@@ -1,5 +1,10 @@
 {
-    "SimpleChat": "0x138c197972bb9d359faa853f451f9f91e28aeffb",
+    "SEPOLIA": {
+        "SimpleChat": "0x138c197972bb9d359faa853f451f9f91e28aeffb"
+    },
+    "GANACHE": {
+        "SimpleChat": "0xb8c3994b04682ec3004e114ef88fa86b6c5fe267"
+    },
     "SimpleChatABI": [
         {
             "anonymous": false,
@@ -25,6 +30,19 @@
             ],
             "name": "ChatCleared",
             "type": "event"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "_receiverAddress",
+                    "type": "address"
+                }
+            ],
+            "name": "clearChat",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
         },
         {
             "anonymous": false,
@@ -125,9 +143,19 @@
                     "internalType": "address",
                     "name": "_receiverAddress",
                     "type": "address"
+                },
+                {
+                    "internalType": "string",
+                    "name": "_fileName",
+                    "type": "string"
+                },
+                {
+                    "internalType": "string",
+                    "name": "_ipfsUrl",
+                    "type": "string"
                 }
             ],
-            "name": "clearChat",
+            "name": "sendFile",
             "outputs": [],
             "stateMutability": "nonpayable",
             "type": "function"
@@ -141,11 +169,24 @@
                 },
                 {
                     "internalType": "string",
-                    "name": "_fileName",
+                    "name": "_content",
                     "type": "string"
                 }
             ],
-            "name": "clearFiles",
+            "name": "sendMessage",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "_receiverAddress",
+                    "type": "address"
+                }
+            ],
+            "name": "setRecipientAddress",
             "outputs": [],
             "stateMutability": "nonpayable",
             "type": "function"
@@ -321,60 +362,6 @@
                 }
             ],
             "stateMutability": "view",
-            "type": "function"
-        },
-        {
-            "inputs": [
-                {
-                    "internalType": "address",
-                    "name": "_receiverAddress",
-                    "type": "address"
-                },
-                {
-                    "internalType": "string",
-                    "name": "_fileName",
-                    "type": "string"
-                },
-                {
-                    "internalType": "string",
-                    "name": "_ipfsUrl",
-                    "type": "string"
-                }
-            ],
-            "name": "sendFile",
-            "outputs": [],
-            "stateMutability": "nonpayable",
-            "type": "function"
-        },
-        {
-            "inputs": [
-                {
-                    "internalType": "address",
-                    "name": "_receiverAddress",
-                    "type": "address"
-                },
-                {
-                    "internalType": "string",
-                    "name": "_content",
-                    "type": "string"
-                }
-            ],
-            "name": "sendMessage",
-            "outputs": [],
-            "stateMutability": "nonpayable",
-            "type": "function"
-        },
-        {
-            "inputs": [
-                {
-                    "internalType": "address",
-                    "name": "_receiverAddress",
-                    "type": "address"
-                }
-            ],
-            "name": "setRecipientAddress",
-            "outputs": [],
-            "stateMutability": "nonpayable",
             "type": "function"
         }
     ]

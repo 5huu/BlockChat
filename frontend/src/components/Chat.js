@@ -172,53 +172,69 @@ const Chat = ({ messages, files, currentAccount, onClearChat, isLoading }) => {
         return groups;
     }, {});
 
+    const handleClearClick = () => {
+        if (window.confirm('Are you sure you want to clear this chat? This will only clear messages from your side.')) {
+            onClearChat();
+        }
+    };
+
     return (
         <>
             <ChatHeader>
                 <ClearButton 
-                    onClick={onClearChat}
+                    onClick={handleClearClick}
                     disabled={isLoading || (!messages.length && !files.length)}
                 >
-                    {isLoading ? 'Clearing...' : 'Clear Chat'}
+                    {isLoading ? (
+                        <span>Clearing...</span>
+                    ) : (
+                        'Clear Chat'
+                    )}
                 </ClearButton>
             </ChatHeader>
             <ChatContainer ref={messagesContainerRef}>
-                {Object.entries(groupedItems).map(([date, items]) => (
-                    <div key={date}>
-                        <DateDivider>{date}</DateDivider>
-                        {items.map((item, index) => {
-                            const isOwnMessage = item.sender.toLowerCase() === currentAccount.toLowerCase();
-                            
-                            return (
-                                <MessageWrapper
-                                    key={`${item.timestamp}-${index}`}
-                                    isSent={isOwnMessage}
-                                >
-                                    <Message isSent={isOwnMessage}>
-                                        {item.hasOwnProperty('content') ? (
-                                            <>
-                                                <MessageContent>{item.content}</MessageContent>
-                                                <Timestamp>{formatTimestamp(item.timestamp)}</Timestamp>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FileLink
-                                                    href={`https://gateway.pinata.cloud/ipfs/${item.ipfsUrl}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                >
-                                                    <FileIcon />
-                                                    {item.fileName}
-                                                </FileLink>
-                                                <Timestamp>{formatTimestamp(item.timestamp)}</Timestamp>
-                                            </>
-                                        )}
-                                    </Message>
-                                </MessageWrapper>
-                            );
-                        })}
+                {isLoading ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                        Clearing messages...
                     </div>
-                ))}
+                ) : (
+                    Object.entries(groupedItems).map(([date, items]) => (
+                        <div key={date}>
+                            <DateDivider>{date}</DateDivider>
+                            {items.map((item, index) => {
+                                const isOwnMessage = item.sender.toLowerCase() === currentAccount.toLowerCase();
+                                
+                                return (
+                                    <MessageWrapper
+                                        key={`${item.timestamp}-${index}`}
+                                        isSent={isOwnMessage}
+                                    >
+                                        <Message isSent={isOwnMessage}>
+                                            {item.hasOwnProperty('content') ? (
+                                                <>
+                                                    <MessageContent>{item.content}</MessageContent>
+                                                    <Timestamp>{formatTimestamp(item.timestamp)}</Timestamp>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <FileLink
+                                                        href={`https://gateway.pinata.cloud/ipfs/${item.ipfsUrl}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        <FileIcon />
+                                                        {item.fileName}
+                                                    </FileLink>
+                                                    <Timestamp>{formatTimestamp(item.timestamp)}</Timestamp>
+                                                </>
+                                            )}
+                                        </Message>
+                                    </MessageWrapper>
+                                );
+                            })}
+                        </div>
+                    ))
+                )}
             </ChatContainer>
         </>
     );
