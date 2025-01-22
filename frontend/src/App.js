@@ -7,6 +7,9 @@ import { initWeb3, uploadToIPFS } from './utils/web3';
 import contractDetails from './contracts/contract-address.json';
 import styled from 'styled-components';
 import NetworkSwitch from './components/NetworkSwitch';
+import { encryptMessage, decryptMessage } from './utils/encryption';
+import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
 
 const AppWrapper = styled.div`
   min-height: 100vh;
@@ -37,6 +40,21 @@ const InputWrapper = styled.div`
   margin-top: 1rem;
 `;
 
+const EncryptionToggle = styled(FormControlLabel)`
+  margin: 1rem 0;
+  color: #fff;
+  .MuiSwitch-track {
+    background-color: #333 !important;
+  }
+  .Mui-checked {
+    color: #4CAF50 !important;
+  }
+  .Mui-checked + .MuiSwitch-track {
+    background-color: #4CAF50 !important;
+    opacity: 0.5;
+  }
+`;
+
 function App() {
     const [web3State, setWeb3State] = useState({
         web3: null,
@@ -50,6 +68,7 @@ function App() {
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [currentNetwork, setCurrentNetwork] = useState('SEPOLIA');
+    const [isEncryptionEnabled, setIsEncryptionEnabled] = useState(true);
 
     useEffect(() => {
         initializeWeb3();
@@ -62,6 +81,12 @@ function App() {
             return () => clearInterval(interval);
         }
     }, [web3State.contract, selectedRecipient]);
+
+    useEffect(() => {
+        if (isEncryptionEnabled) {
+            loadMessages(); // Reload messages when encryption is enabled
+        }
+    }, [isEncryptionEnabled]);
 
     const initializeWeb3 = async () => {
         try {
@@ -116,20 +141,25 @@ function App() {
                 .loadChat(selectedRecipient)
                 .call({ from: account });
 
-            // The response should be an object with '0' and '1' properties
-            // where '0' is messages array and '1' is files array
             const messagesList = response[0] || [];
             const filesList = response[1] || [];
             
-            // Format messages according to the contract's Message struct
-            const formattedMessages = messagesList.map(msg => ({
+            // Process messages based on encryption setting
+            const formattedMessages = await Promise.all(messagesList.map(async msg => ({
                 sender: msg.sender,
                 receiver: msg.receiver,
-                content: msg.content,
+                content: isEncryptionEnabled 
+                    ? await decryptMessage(
+                        msg.content, 
+                        account,
+                        msg.sender.toLowerCase() === account.toLowerCase() 
+                            ? msg.receiver 
+                            : msg.sender
+                    )
+                    : msg.content,
                 timestamp: Number(msg.timestamp)
-            }));
+            })));
 
-            // Format files according to the contract's File struct
             const formattedFiles = filesList.map(file => ({
                 sender: file.sender,
                 receiver: file.receiver,
@@ -191,8 +221,14 @@ function App() {
         setIsLoading(true);
         try {
             const { contract, account } = web3State;
+            
+            // Only encrypt if encryption is enabled
+            const messageContent = isEncryptionEnabled 
+                ? await encryptMessage(content, selectedRecipient, account)
+                : content;
+            
             const tx = await contract.methods
-                .sendMessage(selectedRecipient, content)
+                .sendMessage(selectedRecipient, messageContent)
                 .send({ from: account });
             
             await decodeTransactionData(tx, 'sendMessage');
@@ -293,6 +329,24 @@ function App() {
         }
     };
 
+    const handleEncryptionToggle = async (e) => {
+        const newState = e.target.checked;
+        setIsEncryptionEnabled(newState);
+        
+        // Optional: Show a warning when disabling encryption
+        if (!newState && messages.length > 0) {
+            const confirm = window.confirm(
+                'Disabling encryption will make your messages visible to anyone. Are you sure?'
+            );
+            if (!confirm) {
+                setIsEncryptionEnabled(true);
+                return;
+            }
+        }
+        
+        await loadMessages(); // Reload messages with new encryption state
+    };
+
     return (
         <AppWrapper>
             <NetworkSwitch
@@ -302,6 +356,16 @@ function App() {
             />
             <ChatWrapper>
                 <AppTitle>BlockChat</AppTitle>
+                <EncryptionToggle
+                    control={
+                        <Switch
+                            checked={isEncryptionEnabled}
+                            onChange={handleEncryptionToggle}
+                            color="primary"
+                        />
+                    }
+                    label={`Encryption ${isEncryptionEnabled ? 'On' : 'Off'}`}
+                />
                 <RecipientSelect
                     recipients={recipients}
                     selectedRecipient={selectedRecipient}
@@ -315,6 +379,7 @@ function App() {
                     currentAccount={web3State.account}
                     onClearChat={handleClearChat}
                     isLoading={isLoading}
+                    isEncrypted={isEncryptionEnabled}
                 />
                 <MessageInput
                     onSendMessage={handleSendMessage}

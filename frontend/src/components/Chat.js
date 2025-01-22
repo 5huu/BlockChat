@@ -73,6 +73,8 @@ const MessageContent = styled.div`
   font-size: 0.9rem;
   line-height: 1.4;
   white-space: pre-wrap;
+  opacity: ${props => props.isEncrypted ? 0.8 : 1};
+  color: ${props => props.isEncrypted ? '#4CAF50' : 'white'};
 `;
 
 const Timestamp = styled.div`
@@ -133,7 +135,14 @@ const ClearButton = styled.button`
   }
 `;
 
-const Chat = ({ messages, files, currentAccount, onClearChat, isLoading }) => {
+const MessageTime = styled.div`
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 0.3rem;
+  text-align: right;
+`;
+
+const Chat = ({ messages, files, currentAccount, onClearChat, isLoading, isEncrypted }) => {
     const messagesContainerRef = useRef(null);
 
     useEffect(() => {
@@ -183,17 +192,13 @@ const Chat = ({ messages, files, currentAccount, onClearChat, isLoading }) => {
                     onClick={handleClearClick}
                     disabled={isLoading || (!messages.length && !files.length)}
                 >
-                    {isLoading ? (
-                        <span>Clearing...</span>
-                    ) : (
-                        'Clear Chat'
-                    )}
+                    {isLoading ? 'Clearing...' : 'Clear Chat'}
                 </ClearButton>
             </ChatHeader>
             <ChatContainer ref={messagesContainerRef}>
                 {isLoading ? (
                     <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                        Clearing messages...
+                        Loading messages...
                     </div>
                 ) : (
                     Object.entries(groupedItems).map(([date, items]) => (
@@ -210,8 +215,14 @@ const Chat = ({ messages, files, currentAccount, onClearChat, isLoading }) => {
                                         <Message isSent={isOwnMessage}>
                                             {item.hasOwnProperty('content') ? (
                                                 <>
-                                                    <MessageContent>{item.content}</MessageContent>
-                                                    <Timestamp>{formatTimestamp(item.timestamp)}</Timestamp>
+                                                    <MessageContent 
+                                                        isEncrypted={isEncrypted && item.content !== 'Unable to decrypt message'}
+                                                    >
+                                                        {item.content}
+                                                    </MessageContent>
+                                                    <MessageTime>
+                                                        {formatTimestamp(item.timestamp)}
+                                                    </MessageTime>
                                                 </>
                                             ) : (
                                                 <>
@@ -223,7 +234,7 @@ const Chat = ({ messages, files, currentAccount, onClearChat, isLoading }) => {
                                                         <FileIcon />
                                                         {item.fileName}
                                                     </FileLink>
-                                                    <Timestamp>{formatTimestamp(item.timestamp)}</Timestamp>
+                                                    <MessageTime>{formatTimestamp(item.timestamp)}</MessageTime>
                                                 </>
                                             )}
                                         </Message>
