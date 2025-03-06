@@ -22,6 +22,11 @@ export const encryptMessage = async (message, recipientAddress, senderAddress) =
 
 export const decryptMessage = async (encryptedMessage, userAddress, otherAddress) => {
     try {
+        // Check if the message is actually encrypted
+        if (!encryptedMessage || encryptedMessage.length < 10) {
+            return encryptedMessage || 'Empty message';
+        }
+
         // Create key in same way as encryption - sort addresses to ensure consistent order
         const addresses = [
             userAddress.toLowerCase(),
@@ -34,7 +39,11 @@ export const decryptMessage = async (encryptedMessage, userAddress, otherAddress
         const decryptedBytes = CryptoJS.AES.decrypt(encryptedMessage, decryptionKey);
         const decryptedMessage = decryptedBytes.toString(CryptoJS.enc.Utf8);
         
-        return decryptedMessage || 'Unable to decrypt message';
+        if (!decryptedMessage) {
+            throw new Error('Decryption resulted in empty message');
+        }
+        
+        return decryptedMessage;
     } catch (error) {
         console.error('Decryption error:', error);
         return 'Unable to decrypt message';

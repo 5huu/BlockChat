@@ -85,13 +85,13 @@ const FileIcon = () => (
   </svg>
 );
 
-const MessageInput = ({ onSendMessage, onSendFile, isLoading }) => {
+const MessageInput = ({ onSendMessage, onSendFile, isLoading, isUploading }) => {
     const [message, setMessage] = useState('');
     const [selectedFile, setSelectedFile] = useState(null);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (isLoading) return;
+        if (isLoading || isUploading) return;
 
         if (selectedFile) {
             await onSendFile(selectedFile);
@@ -117,6 +117,9 @@ const MessageInput = ({ onSendMessage, onSendFile, isLoading }) => {
         }
     };
 
+    const isInputDisabled = isLoading || isUploading;
+    const buttonText = isUploading ? 'Uploading...' : isLoading ? 'Sending...' : 'Send';
+
     return (
         <InputContainer onSubmit={handleSubmit}>
             <InputWrapper>
@@ -124,7 +127,7 @@ const MessageInput = ({ onSendMessage, onSendFile, isLoading }) => {
                     <FileInput
                         type="file"
                         onChange={handleFileSelect}
-                        disabled={isLoading}
+                        disabled={isInputDisabled}
                     />
                     <FileIcon />
                 </FileUploadLabel>
@@ -140,16 +143,16 @@ const MessageInput = ({ onSendMessage, onSendFile, isLoading }) => {
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyPress={handleKeyPress}
                         placeholder="Type your message..."
-                        disabled={isLoading}
+                        disabled={isInputDisabled}
                     />
                 )}
             </InputWrapper>
             
             <SendButton
                 type="submit"
-                disabled={(!message.trim() && !selectedFile) || isLoading}
+                disabled={(!message.trim() && !selectedFile) || isInputDisabled}
             >
-                {isLoading ? 'Sending...' : 'Send'}
+                {buttonText}
             </SendButton>
         </InputContainer>
     );

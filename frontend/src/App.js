@@ -65,8 +65,12 @@ function App() {
     const [selectedRecipient, setSelectedRecipient] = useState('');
     const [messages, setMessages] = useState([]);
     const [files, setFiles] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
+    const [loadingStates, setLoadingStates] = useState({
+        messages: false,
+        sending: false,
+        uploading: false,
+        clearing: false
+    });
     const [currentNetwork, setCurrentNetwork] = useState('SEPOLIA');
     const [isEncryptionEnabled, setIsEncryptionEnabled] = useState(true);
 
@@ -75,16 +79,20 @@ function App() {
     }, []);
 
     useEffect(() => {
-        if (web3State.contract && selectedRecipient) {
-            loadMessages();
-            const interval = setInterval(loadMessages, 5000); // Poll every 5 seconds
+        if (web3State.contract && web3State.account && selectedRecipient) {
+            // Initial load without showing loading indicator
+            loadMessages(false);
+            
+            // Set up polling with silent updates
+            const interval = setInterval(() => loadMessages(true), 5000); // Poll every 5 seconds
             return () => clearInterval(interval);
         }
-    }, [web3State.contract, selectedRecipient]);
+    }, [web3State.contract, web3State.account, selectedRecipient]);
 
     useEffect(() => {
-        if (isEncryptionEnabled) {
-            loadMessages(); // Reload messages when encryption is enabled
+        if (isEncryptionEnabled && web3State.contract && web3State.account && selectedRecipient) {
+            // Show loading when encryption is toggled
+            loadMessages(false);
         }
     }, [isEncryptionEnabled]);
 
@@ -133,9 +141,20 @@ function App() {
         }
     };
 
-    const loadMessages = async () => {
+    const loadMessages = async (silent = false) => {
         try {
             const { contract, account } = web3State;
+            
+            // Check if contract or account is null
+            if (!contract || !account) {
+                console.log('Contract or account not initialized yet');
+                return;
+            }
+
+            // Only show loading indicator if not silent
+            if (!silent) {
+                setLoadingStates(prev => ({ ...prev, messages: true }));
+            }
             
             const response = await contract.methods
                 .loadChat(selectedRecipient)
@@ -144,21 +163,54 @@ function App() {
             const messagesList = response[0] || [];
             const filesList = response[1] || [];
             
-            // Process messages based on encryption setting
-            const formattedMessages = await Promise.all(messagesList.map(async msg => ({
-                sender: msg.sender,
-                receiver: msg.receiver,
-                content: isEncryptionEnabled 
-                    ? await decryptMessage(
-                        msg.content, 
+            // Process messages based on their format
+            const formattedMessages = await Promise.all(messagesList.map(async msg => {
+                const content = msg.content;
+                let processedContent;
+                let isEncrypted = false;
+                
+                // Check if message has encryption prefix
+                if (content.startsWith('ENC:')) {
+                    isEncrypted = true;
+                    const encryptedContent = content.substring(4); // Remove 'ENC:' prefix
+                    processedContent = await decryptMessage(
+                        encryptedContent, 
                         account,
                         msg.sender.toLowerCase() === account.toLowerCase() 
                             ? msg.receiver 
                             : msg.sender
-                    )
-                    : msg.content,
-                timestamp: Number(msg.timestamp)
-            })));
+                    );
+                } else if (content.startsWith('PLAIN:')) {
+                    // Handle plaintext messages
+                    processedContent = content.substring(6); // Remove 'PLAIN:' prefix
+                } else {
+                    // Handle legacy messages (for backward compatibility)
+                    if (isEncryptionEnabled) {
+                        try {
+                            processedContent = await decryptMessage(
+                                content, 
+                                account,
+                                msg.sender.toLowerCase() === account.toLowerCase() 
+                                    ? msg.receiver 
+                                    : msg.sender
+                            );
+                            isEncrypted = true;
+                        } catch (error) {
+                            processedContent = content; // If decryption fails, show as is
+                        }
+                    } else {
+                        processedContent = content;
+                    }
+                }
+                
+                return {
+                    sender: msg.sender,
+                    receiver: msg.receiver,
+                    content: processedContent,
+                    isEncrypted,
+                    timestamp: Number(msg.timestamp)
+                };
+            }));
 
             const formattedFiles = filesList.map(file => ({
                 sender: file.sender,
@@ -172,6 +224,11 @@ function App() {
             setFiles(formattedFiles);
         } catch (error) {
             console.error('Error loading messages:', error);
+        } finally {
+            // Only update loading state if not silent
+            if (!silent) {
+                setLoadingStates(prev => ({ ...prev, messages: false }));
+            }
         }
     };
 
@@ -218,14 +275,18 @@ function App() {
     const handleSendMessage = async (content) => {
         if (!selectedRecipient || !content.trim()) return;
 
-        setIsLoading(true);
+        setLoadingStates(prev => ({ ...prev, sending: true }));
         try {
             const { contract, account } = web3State;
             
-            // Only encrypt if encryption is enabled
-            const messageContent = isEncryptionEnabled 
-                ? await encryptMessage(content, selectedRecipient, account)
-                : content;
+            // Add a prefix to indicate if the message is encrypted
+            let messageContent;
+            if (isEncryptionEnabled) {
+                const encryptedContent = await encryptMessage(content, selectedRecipient, account);
+                messageContent = `ENC:${encryptedContent}`; // Add prefix to indicate encryption
+            } else {
+                messageContent = `PLAIN:${content}`; // Add prefix to indicate plaintext
+            }
             
             const tx = await contract.methods
                 .sendMessage(selectedRecipient, messageContent)
@@ -233,21 +294,20 @@ function App() {
             
             await decodeTransactionData(tx, 'sendMessage');
             
-            setTimeout(async () => {
-                await loadMessages();
-                setIsLoading(false);
-            }, 1000);
+            // Load messages silently after sending
+            await loadMessages(true);
         } catch (error) {
             console.error('Error sending message:', error);
             alert('Failed to send message. Please try again.');
-            setIsLoading(false);
+        } finally {
+            setLoadingStates(prev => ({ ...prev, sending: false }));
         }
     };
 
     const handleFileSelect = async (file) => {
         if (!selectedRecipient || !file) return;
 
-        setIsUploading(true);
+        setLoadingStates(prev => ({ ...prev, uploading: true }));
         try {
             const { contract, account } = web3State;
             const reader = new FileReader();
@@ -260,25 +320,26 @@ function App() {
                         .send({ from: account });
                     
                     await decodeTransactionData(tx, 'sendFile');
-                    await loadMessages();
+                    // Load messages silently after uploading
+                    await loadMessages(true);
                 } catch (error) {
                     console.error('Error uploading file:', error);
                     alert('Failed to upload file. Please try again.');
                 } finally {
-                    setIsUploading(false);
+                    setLoadingStates(prev => ({ ...prev, uploading: false }));
                 }
             };
 
             reader.readAsArrayBuffer(file);
         } catch (error) {
             console.error('Error handling file:', error);
-            setIsUploading(false);
+            setLoadingStates(prev => ({ ...prev, uploading: false }));
             alert('Failed to process file. Please try again.');
         }
     };
 
     const handleAddRecipient = async (address) => {
-        setIsLoading(true);
+        setLoadingStates(prev => ({ ...prev, messages: true }));
         try {
             const { contract, account } = web3State;
             const tx = await contract.methods
@@ -291,24 +352,24 @@ function App() {
             console.error('Error adding recipient:', error);
             alert('Failed to add recipient. Please try again.');
         } finally {
-            setIsLoading(false);
+            setLoadingStates(prev => ({ ...prev, messages: false }));
         }
     };
 
     const handleNetworkSwitch = async (network) => {
-        setIsLoading(true);
+        setLoadingStates(prev => ({ ...prev, messages: true }));
         try {
             setCurrentNetwork(network);
             await initializeWeb3();
         } finally {
-            setIsLoading(false);
+            setLoadingStates(prev => ({ ...prev, messages: false }));
         }
     };
 
     const handleClearChat = async () => {
         if (!selectedRecipient) return;
         
-        setIsLoading(true);
+        setLoadingStates(prev => ({ ...prev, clearing: true }));
         try {
             const { contract, account } = web3State;
             
@@ -325,7 +386,7 @@ function App() {
             console.error('Error clearing chat:', error);
             alert('Failed to clear chat. Please try again.');
         } finally {
-            setIsLoading(false);
+            setLoadingStates(prev => ({ ...prev, clearing: false }));
         }
     };
 
@@ -352,7 +413,7 @@ function App() {
             <NetworkSwitch
                 currentNetwork={currentNetwork}
                 onNetworkSwitch={handleNetworkSwitch}
-                isLoading={isLoading}
+                isLoading={loadingStates.messages}
             />
             <ChatWrapper>
                 <AppTitle>BlockChat</AppTitle>
@@ -371,20 +432,22 @@ function App() {
                     selectedRecipient={selectedRecipient}
                     onRecipientChange={setSelectedRecipient}
                     onAddRecipient={handleAddRecipient}
-                    isLoading={isLoading}
+                    isLoading={loadingStates.messages}
                 />
                 <Chat
                     messages={messages}
                     files={files}
                     currentAccount={web3State.account}
                     onClearChat={handleClearChat}
-                    isLoading={isLoading}
+                    isLoading={loadingStates.messages}
+                    isClearingChat={loadingStates.clearing}
                     isEncrypted={isEncryptionEnabled}
                 />
                 <MessageInput
                     onSendMessage={handleSendMessage}
                     onSendFile={handleFileSelect}
-                    isLoading={isLoading || isUploading}
+                    isLoading={loadingStates.sending}
+                    isUploading={loadingStates.uploading}
                 />
             </ChatWrapper>
         </AppWrapper>

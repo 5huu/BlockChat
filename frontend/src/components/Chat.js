@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
 const ChatContainer = styled.div`
@@ -45,7 +45,7 @@ const DateDivider = styled.div`
 
 const MessageWrapper = styled.div`
   display: flex;
-  justify-content: ${props => props.isSent ? 'flex-end' : 'flex-start'};
+  justify-content: ${props => props.$isSent ? 'flex-end' : 'flex-start'};
   margin: 0.5rem 0;
   padding: 0 1rem;
 `;
@@ -56,12 +56,12 @@ const Message = styled.div`
   width: fit-content;
   padding: 0.75rem 1rem;
   border-radius: 16px;
-  background: ${props => props.isSent ? '#2D3748' : '#1A365D'};
+  background: ${props => props.$isSent ? '#2D3748' : '#1A365D'};
   color: #fff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   position: relative;
   
-  ${props => props.isSent ? `
+  ${props => props.$isSent ? `
     border-bottom-right-radius: 4px;
   ` : `
     border-bottom-left-radius: 4px;
@@ -73,8 +73,8 @@ const MessageContent = styled.div`
   font-size: 0.9rem;
   line-height: 1.4;
   white-space: pre-wrap;
-  opacity: ${props => props.isEncrypted ? 0.8 : 1};
-  color: ${props => props.isEncrypted ? '#4CAF50' : 'white'};
+  opacity: ${props => props.$isEncrypted ? 0.8 : 1};
+  color: ${props => props.$isEncrypted ? '#4CAF50' : 'white'};
 `;
 
 const Timestamp = styled.div`
@@ -142,12 +142,20 @@ const MessageTime = styled.div`
   text-align: right;
 `;
 
-const Chat = ({ messages, files, currentAccount, onClearChat, isLoading, isEncrypted }) => {
+const Chat = ({ messages, files, currentAccount, onClearChat, isLoading, isClearingChat, isEncrypted }) => {
     const messagesContainerRef = useRef(null);
+    const [initialLoad, setInitialLoad] = useState(true);
 
     useEffect(() => {
         if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
+    }, [messages, files]);
+
+    // Set initialLoad to false after first render
+    useEffect(() => {
+        if (messages.length > 0 || files.length > 0) {
+            setInitialLoad(false);
         }
     }, [messages, files]);
 
@@ -190,15 +198,19 @@ const Chat = ({ messages, files, currentAccount, onClearChat, isLoading, isEncry
             <ChatHeader>
                 <ClearButton 
                     onClick={handleClearClick}
-                    disabled={isLoading || (!messages.length && !files.length)}
+                    disabled={isClearingChat || (!messages.length && !files.length)}
                 >
-                    {isLoading ? 'Clearing...' : 'Clear Chat'}
+                    {isClearingChat ? 'Clearing...' : 'Clear Chat'}
                 </ClearButton>
             </ChatHeader>
             <ChatContainer ref={messagesContainerRef}>
-                {isLoading ? (
+                {isLoading && initialLoad ? (
                     <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
                         Loading messages...
+                    </div>
+                ) : messages.length === 0 && files.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                        No messages yet. Start a conversation!
                     </div>
                 ) : (
                     Object.entries(groupedItems).map(([date, items]) => (
@@ -210,13 +222,13 @@ const Chat = ({ messages, files, currentAccount, onClearChat, isLoading, isEncry
                                 return (
                                     <MessageWrapper
                                         key={`${item.timestamp}-${index}`}
-                                        isSent={isOwnMessage}
+                                        $isSent={isOwnMessage}
                                     >
-                                        <Message isSent={isOwnMessage}>
+                                        <Message $isSent={isOwnMessage}>
                                             {item.hasOwnProperty('content') ? (
                                                 <>
                                                     <MessageContent 
-                                                        isEncrypted={isEncrypted && item.content !== 'Unable to decrypt message'}
+                                                        $isEncrypted={item.isEncrypted}
                                                     >
                                                         {item.content}
                                                     </MessageContent>

@@ -10,7 +10,7 @@ const SwitchContainer = styled.div`
 
 const SwitchButton = styled.button`
   padding: 8px 16px;
-  background-color: ${props => props.isActive ? '#007bff' : '#444444'};
+  background-color: ${props => props.$isActive ? '#007bff' : '#444444'};
   color: white;
   border: none;
   border-radius: 4px;
@@ -19,7 +19,7 @@ const SwitchButton = styled.button`
   transition: background-color 0.3s;
 
   &:hover:not(:disabled) {
-    background-color: ${props => props.isActive ? '#0056b3' : '#555555'};
+    background-color: ${props => props.$isActive ? '#0056b3' : '#555555'};
   }
 
   &:disabled {
@@ -43,14 +43,14 @@ const NetworkSwitch = ({ currentNetwork, onNetworkSwitch, isLoading }) => {
     <SwitchContainer>
       <SwitchButton
         onClick={() => handleSwitch('SEPOLIA')}
-        isActive={currentNetwork === 'SEPOLIA'}
+        $isActive={currentNetwork === 'SEPOLIA'}
         disabled={isLoading || currentNetwork === 'SEPOLIA'}
       >
         Sepolia
       </SwitchButton>
       <SwitchButton
         onClick={() => handleSwitch('GANACHE')}
-        isActive={currentNetwork === 'GANACHE'}
+        $isActive={currentNetwork === 'GANACHE'}
         disabled={isLoading || currentNetwork === 'GANACHE'}
       >
         Ganache
